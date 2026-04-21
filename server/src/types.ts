@@ -20,6 +20,7 @@ export interface SearchResult {
     followers?: number;
     verified?: boolean;
   };
+  contentType?: string; // article, tutorial, video, tweet
 }
 
 // Twitter 质量过滤配置
@@ -73,6 +74,9 @@ export interface HotspotWithKeyword {
     text: string;
     category: string | null;
   } | null;
+  contentType: string;
+  fullContent: string | null;
+  fullContentFetched: boolean;
 }
 
 export interface Tweet {

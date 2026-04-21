@@ -38,6 +38,9 @@ export interface Hotspot {
   publishedAt: string | null;
   createdAt: string;
   keyword: { id: string; text: string; category: string | null } | null;
+  contentType?: string;
+  fullContent?: string;
+  fullContentFetched?: boolean;
 }
 
 export interface Notification {
@@ -48,6 +51,14 @@ export interface Notification {
   isRead: boolean;
   hotspotId: string | null;
   createdAt: string;
+}
+
+export interface TutorialContent {
+  id: string;
+  title: string;
+  url: string;
+  content: string;
+  fetchedAt: string | null;
 }
 
 export interface Stats {
@@ -182,5 +193,21 @@ export const settingsApi = {
 };
 
 // Manual trigger
-export const triggerHotspotCheck = () => 
+export const triggerHotspotCheck = () =>
   request<{ message: string }>('/check-hotspots', { method: 'POST' });
+
+// Tutorials API
+export const tutorialsApi = {
+  getAll: (params?: { page?: number; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      if (params.page) searchParams.append('page', String(params.page));
+      if (params.limit) searchParams.append('limit', String(params.limit));
+    }
+    return request<{ data: Hotspot[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
+      `/tutorials?${searchParams}`
+    );
+  },
+  getContent: (id: string) => request<TutorialContent>(`/tutorials/${id}/content`),
+  triggerFetch: (id: string) => request<Hotspot>(`/tutorials/${id}/fetch`, { method: 'POST' }),
+};
