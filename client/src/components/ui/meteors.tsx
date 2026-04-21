@@ -1,6 +1,12 @@
 "use client";
 import { cn } from "../../lib/utils";
 
+const PREGENERATED_STYLES = new Array(20).fill(true).map(() => ({
+  left: Math.floor(Math.random() * (400 - -400) + -400) + "px",
+  animationDelay: Math.random() * (0.8 - 0.2) + 0.2 + "s",
+  animationDuration: Math.floor(Math.random() * (10 - 2) + 2) + "s",
+}));
+
 export const Meteors = ({
   number = 12,
   className,
@@ -8,6 +14,7 @@ export const Meteors = ({
   number?: number;
   className?: string;
 }) => {
+  const styles = PREGENERATED_STYLES.slice(0, number);
   const meteors = new Array(number).fill(true);
   return (
     <>
@@ -21,9 +28,7 @@ export const Meteors = ({
           )}
           style={{
             top: 0,
-            left: Math.floor(Math.random() * (400 - -400) + -400) + "px",
-            animationDelay: Math.random() * (0.8 - 0.2) + 0.2 + "s",
-            animationDuration: Math.floor(Math.random() * (10 - 2) + 2) + "s",
+            ...styles[idx],
           }}
         />
       ))}

@@ -152,7 +152,7 @@ export const notificationsApi = {
         if (value !== undefined) searchParams.append(key, String(value));
       });
     }
-    return request<{ data: Notification[]; unreadCount: number; pagination: any }>(
+    return request<{ data: Notification[]; unreadCount: number; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
       `/notifications?${searchParams}`
     );
   },
