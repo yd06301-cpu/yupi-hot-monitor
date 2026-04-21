@@ -8,8 +8,8 @@ import {
   MessageCircle, Repeat2, Quote, User, Shield, ShieldAlert,
   ChevronDown, ChevronUp, ChevronsUpDown, ThermometerSun, FileText
 } from 'lucide-react';
-import { 
-  keywordsApi, hotspotsApi, notificationsApi, triggerHotspotCheck,
+import {
+  keywordsApi, hotspotsApi, notificationsApi, tutorialsApi, triggerHotspotCheck,
   type Keyword, type Hotspot, type Stats, type Notification
 } from './services/api';
 import { onNewHotspot, onNotification, subscribeToKeywords } from './services/socket';
@@ -20,6 +20,7 @@ import { Meteors } from './components/ui/meteors';
 import FilterSortBar, { defaultFilterState, type FilterState } from './components/FilterSortBar';
 import { sortHotspots } from './utils/sortHotspots';
 import { relativeTime, formatDateTime } from './utils/relativeTime';
+import ReactMarkdown from 'react-markdown';
 // TextGenerateEffect available for future use
 
 /** 计算热度综合指标（归一化 0-100） */
@@ -68,6 +69,10 @@ function App() {
   const [expandedReasons, setExpandedReasons] = useState<Set<string>>(new Set());
   const [expandedContents, setExpandedContents] = useState<Set<string>>(new Set());
   const [allReasonsExpanded, setAllReasonsExpanded] = useState(false);
+  // Tutorial detail view state
+  const [selectedTutorial, setSelectedTutorial] = useState<Hotspot | null>(null);
+  const [tutorialContent, setTutorialContent] = useState<string | null>(null);
+  const [isLoadingTutorial, setIsLoadingTutorial] = useState(false);
 
   // 加载数据
   const loadData = useCallback(async () => {
@@ -250,6 +255,38 @@ function App() {
     }
     setAllReasonsExpanded(!allReasonsExpanded);
   };
+
+  // Load tutorial content
+  const loadTutorialContent = async (hotspot: Hotspot) => {
+    setIsLoadingTutorial(true);
+    setSelectedTutorial(hotspot);
+    try {
+      const data = await tutorialsApi.getContent(hotspot.id);
+      setTutorialContent(data.content);
+    } catch {
+      setTutorialContent('内容尚未抓取或加载失败');
+    } finally {
+      setIsLoadingTutorial(false);
+    }
+  };
+
+  const closeTutorialModal = () => {
+    setSelectedTutorial(null);
+    setTutorialContent(null);
+  };
+
+  // Keyboard support: Escape closes modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedTutorial) {
+        closeTutorialModal();
+      }
+    };
+    if (selectedTutorial) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTutorial]);
 
   // Client-side filtering/sorting for search results
   const filteredSearchResults = useMemo(() => {
@@ -804,16 +841,27 @@ function App() {
                           )}
                         </div>
                         
-                        {/* Link */}
-                        <a
-                          href={hotspot.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="p-2.5 rounded-xl bg-white/5 hover:bg-blue-500/20 text-slate-500 hover:text-blue-400 transition-all opacity-0 group-hover:opacity-100"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {hotspot.contentType === 'tutorial' && hotspot.fullContentFetched && (
+                            <button
+                              onClick={() => loadTutorialContent(hotspot)}
+                              className="p-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 transition-all text-sm flex items-center gap-1.5"
+                            >
+                              <FileText className="w-4 h-4" />
+                              阅读全文
+                            </button>
+                          )}
+                          <a
+                            href={hotspot.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-2.5 rounded-xl bg-white/5 hover:bg-blue-500/20 text-slate-500 hover:text-blue-400 transition-all"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        </div>
                       </div>
                     </motion.div>
                     );
@@ -1116,6 +1164,71 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Tutorial Detail Modal */}
+      <AnimatePresence>
+        {selectedTutorial && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeTutorialModal}
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50"
+            />
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 20 }}
+              className="fixed inset-4 md:inset-10 z-50 flex items-center justify-center pointer-events-none"
+            >
+              <div className="bg-[#0a0a1a] border border-white/10 rounded-2xl shadow-2xl w-full max-w-4xl max-h-full overflow-hidden pointer-events-auto flex flex-col">
+                {/* Header */}
+                <div className="flex items-center justify-between p-5 border-b border-white/10">
+                  <h2 className="text-lg font-semibold text-white line-clamp-2 pr-4">
+                    {selectedTutorial.title}
+                  </h2>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <a
+                      href={selectedTutorial.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 text-sm flex items-center gap-1.5 transition-all"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                      原文链接
+                    </a>
+                    <button
+                      onClick={closeTutorialModal}
+                      className="p-2 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-all"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-6">
+                  {isLoadingTutorial ? (
+                    <div className="flex items-center justify-center py-16">
+                      <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                    </div>
+                  ) : tutorialContent ? (
+                    <div className="prose prose-invert prose-slate max-w-none">
+                      <ReactMarkdown>{tutorialContent}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="text-center py-16 text-slate-500">
+                      内容加载失败
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

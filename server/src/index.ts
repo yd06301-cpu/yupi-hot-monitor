@@ -8,9 +8,11 @@ import cron from 'node-cron';
 import { prisma } from './db.js';
 import keywordsRouter from './routes/keywords.js';
 import hotspotsRouter from './routes/hotspots.js';
+import tutorialsRouter from './routes/tutorials.js';
 import settingsRouter from './routes/settings.js';
 import notificationsRouter from './routes/notifications.js';
 import { runHotspotCheck } from './jobs/hotspotChecker.js';
+import { runTutorialSync } from './jobs/tutorialContentSync.js';
 
 dotenv.config();
 
@@ -30,6 +32,7 @@ app.use(express.json());
 // Routes
 app.use('/api/keywords', keywordsRouter);
 app.use('/api/hotspots', hotspotsRouter);
+app.use('/api/tutorials', tutorialsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/notifications', notificationsRouter);
 
@@ -77,6 +80,17 @@ cron.schedule('*/30 * * * *', async () => {
   }
 });
 
+// Scheduled job: Run tutorial content sync every hour
+cron.schedule('0 * * * *', async () => {
+  console.log('📚 Running scheduled tutorial content sync...');
+  try {
+    await runTutorialSync(io);
+    console.log('✅ Tutorial content sync completed');
+  } catch (error) {
+    console.error('❌ Tutorial content sync failed:', error);
+  }
+});
+
 // Export for use in other modules
 export { io };
 
@@ -88,6 +102,7 @@ httpServer.listen(PORT, () => {
   📡 Server running on http://localhost:${PORT}
   🔌 WebSocket ready
   ⏰ Hotspot check scheduled every 30 minutes
+  📚 Tutorial content sync scheduled every hour
   `);
 });
 

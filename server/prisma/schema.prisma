@@ -43,15 +43,18 @@ model Hotspot {
   authorName      String?   // 作者名称
   authorUsername  String?   // 作者用户名
   authorAvatar    String?   // 作者头像
-  authorFollowers Int?      // 作者粉丝数
-  authorVerified  Boolean?  // 作者是否认证
-  publishedAt     DateTime?
-  difficulty      String?   // 教程难度：easy, medium, hard
-  estimatedTime   String?   // 预估学习时间，如 "10min", "30min", "1h"
-  techStack       String?   // 技术栈标签，逗号分隔
-  createdAt       DateTime  @default(now())
-  keywordId       String?
-  keyword         Keyword?  @relation(fields: [keywordId], references: [id], onDelete: SetNull)
+  authorFollowers    Int?      // 作者粉丝数
+  authorVerified     Boolean?  // 作者是否认证
+  publishedAt        DateTime?
+  difficulty         String?   // 教程难度：easy, medium, hard
+  estimatedTime      String?   // 预估学习时间，如 "10min", "30min", "1h"
+  techStack          String?   // 技术栈标签，逗号分隔
+  contentType        String    @default("article") // article, tutorial, video, tweet
+  fullContent        String?   // 完整正文内容（Markdown 或纯文本）
+  fullContentFetched Boolean   @default(false) // 是否已抓取全文
+  createdAt          DateTime  @default(now())
+  keywordId          String?
+  keyword            Keyword?  @relation(fields: [keywordId], references: [id], onDelete: SetNull)
 
   @@unique([url, source])
 }
