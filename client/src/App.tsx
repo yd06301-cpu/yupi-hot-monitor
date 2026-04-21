@@ -88,7 +88,7 @@ function App() {
 
       const [keywordsData, hotspotsData, statsData, notifData] = await Promise.all([
         keywordsApi.getAll(),
-        hotspotsApi.getAll(filterParams as any),
+        hotspotsApi.getAll(filterParams),
         hotspotsApi.getStats(),
         notificationsApi.getAll({ limit: 20 })
       ]);
@@ -154,8 +154,9 @@ function App() {
       setNewKeyword('');
       showToast('关键词添加成功', 'success');
       subscribeToKeywords([keyword.text]);
-    } catch (error: any) {
-      showToast(error.message || '添加失败', 'error');
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : '添加失败';
+      showToast(msg, 'error');
     }
   };
 
@@ -165,7 +166,7 @@ function App() {
       await keywordsApi.delete(id);
       setKeywords(prev => prev.filter(k => k.id !== id));
       showToast('关键词已删除', 'success');
-    } catch (error) {
+    } catch {
       showToast('删除失败', 'error');
     }
   };
@@ -175,7 +176,7 @@ function App() {
     try {
       const updated = await keywordsApi.toggle(id);
       setKeywords(prev => prev.map(k => k.id === id ? updated : k));
-    } catch (error) {
+    } catch {
       showToast('操作失败', 'error');
     }
   };
@@ -190,7 +191,7 @@ function App() {
       const result = await hotspotsApi.search(searchQuery);
       setSearchResults(result.results);
       showToast(`找到 ${result.results.length} 条结果`, 'success');
-    } catch (error) {
+    } catch {
       showToast('搜索失败', 'error');
     } finally {
       setIsLoading(false);
@@ -204,7 +205,7 @@ function App() {
       await triggerHotspotCheck();
       showToast('热点检查已触发', 'success');
       setTimeout(loadData, 5000);
-    } catch (error) {
+    } catch {
       showToast('触发失败', 'error');
     } finally {
       setIsChecking(false);
@@ -217,8 +218,8 @@ function App() {
       await notificationsApi.markAllAsRead();
       setUnreadCount(0);
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
-    } catch (error) {
-      console.error('Failed to mark as read:', error);
+    } catch {
+      console.error('Failed to mark as read');
     }
   };
 

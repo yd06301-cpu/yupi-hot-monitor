@@ -17,6 +17,7 @@ export interface FilterState {
   sortOrder: string;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const defaultFilterState: FilterState = {
   source: '',
   importance: '',
