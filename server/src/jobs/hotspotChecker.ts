@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import { searchTwitter } from '../services/twitter.js';
 import { searchBing, searchHackerNews, deduplicateResults } from '../services/search.js';
 import { searchSogou, searchBilibili, searchWeibo, detectAndFetchAccount } from '../services/chinaSearch.js';
+import { fetchAllTutorialFeeds } from '../services/rssFeeds.js';
 import { analyzeContent, expandKeyword, preMatchKeyword } from '../services/ai.js';
 import { sendHotspotEmail } from '../services/email.js';
 import type { SearchResult } from '../types.js';
@@ -10,6 +11,71 @@ import type { SearchResult } from '../types.js';
 // 新鲜度过滤：丢弃超过指定小时数的内容
 // Twitter 层面已通过 since: 限制了时间范围，这里只做兜底
 const MAX_AGE_HOURS = 7 * 24; // 7天
+
+// ========== 教程元数据提取工具函数 ==========
+
+/**
+ * 从教程内容中提取难度级别
+ */
+function extractDifficulty(content: string): string | null {
+  const lower = content.toLowerCase();
+  if (/\b(beginner|入门|初级|easy|basic|fundamentals|getting started)\b/i.test(lower)) {
+    return 'easy';
+  }
+  if (/\b(intermediate|中级|进阶|medium)\b/i.test(lower)) {
+    return 'medium';
+  }
+  if (/\b(advanced|高级|hard|expert|deep dive)\b/i.test(lower)) {
+    return 'hard';
+  }
+  return null;
+}
+
+/**
+ * 从教程内容中提取预估学习时间
+ */
+function extractEstimatedTime(content: string): string | null {
+  // 匹配常见时间格式：10min, 1h, 30 minutes, 2 hours, 1.5h
+  const match = content.match(/\b(\d+\.?\d*)\s*(min|minute|hour|hr|h|分钟|小时)\b/i);
+  if (match) {
+    const value = match[1];
+    const unit = match[2].toLowerCase();
+    if (unit.startsWith('h') || unit.includes('小时')) {
+      return `${value}h`;
+    }
+    return `${value}min`;
+  }
+  return null;
+}
+
+/**
+ * 从教程标题和内容中提取技术栈标签
+ */
+function extractTechStack(text: string): string | null {
+  const techs: string[] = [];
+  const knownTech = [
+    'Python', 'JavaScript', 'TypeScript', 'React', 'Vue', 'Angular',
+    'Node.js', 'Go', 'Rust', 'Java', 'C++', 'C#',
+    'TensorFlow', 'PyTorch', 'Machine Learning', 'Deep Learning',
+    'Docker', 'Kubernetes', 'AWS', 'Azure', 'GCP',
+    'Next.js', 'Nuxt', 'Svelte', 'Tailwind CSS',
+    'GraphQL', 'REST API', 'PostgreSQL', 'MySQL', 'MongoDB',
+    'Redis', 'Elasticsearch', 'Kafka', 'RabbitMQ',
+    'CI/CD', 'DevOps', 'Microservices', 'Serverless',
+    'Claude', 'GPT', 'LLM', 'AI', 'OpenAI', 'Anthropic'
+  ];
+
+  for (const tech of knownTech) {
+    const regex = new RegExp(`\\b${tech.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+    if (regex.test(text)) {
+      techs.push(tech);
+    }
+  }
+
+  return techs.length > 0 ? techs.slice(0, 5).join(', ') : null;
+}
+
+// ========== 热点检查主流程 ==========
 
 function filterByFreshness(results: SearchResult[]): SearchResult[] {
   const cutoff = new Date(Date.now() - MAX_AGE_HOURS * 3600 * 1000);
@@ -73,21 +139,23 @@ export async function runHotspotCheck(io: Server): Promise<void> {
       const expandedKeywords = await expandKeyword(keyword.text);
       console.log(`  📋 Expanded to ${expandedKeywords.length} variants: ${expandedKeywords.slice(0, 5).join(', ')}${expandedKeywords.length > 5 ? '...' : ''}`);
 
-      // 第二步：从多个来源获取数据（国际 + 国内并行请求）
+      // 第二步：从多个来源获取数据（国际 + 国内 + 教程源并行请求）
       const [
         twitterResults,
         bingResults,
         hackernewsResults,
         sogouResults,
         bilibiliResults,
-        weiboResults
+        weiboResults,
+        tutorialResults
       ] = await Promise.allSettled([
         searchTwitter(keyword.text),
         searchBing(keyword.text),
         searchHackerNews(keyword.text),
         searchSogou(keyword.text),
         searchBilibili(keyword.text),
-        searchWeibo(keyword.text)
+        searchWeibo(keyword.text),
+        fetchAllTutorialFeeds()
       ]);
 
       const allResults: SearchResult[] = [];
@@ -104,7 +172,8 @@ export async function runHotspotCheck(io: Server): Promise<void> {
         { name: 'HackerNews', result: hackernewsResults },
         { name: 'Sogou', result: sogouResults },
         { name: 'Bilibili', result: bilibiliResults },
-        { name: 'Weibo', result: weiboResults }
+        { name: 'Weibo', result: weiboResults },
+        { name: 'Tutorial', result: tutorialResults }
       ];
 
       for (const source of sources) {
@@ -197,6 +266,9 @@ export async function runHotspotCheck(io: Server): Promise<void> {
               authorFollowers: item.author?.followers || null,
               authorVerified: item.author?.verified ?? null,
               publishedAt: item.publishedAt || null,
+              difficulty: item.source === 'tutorial' ? extractDifficulty(item.content) : null,
+              estimatedTime: item.source === 'tutorial' ? extractEstimatedTime(item.content) : null,
+              techStack: item.source === 'tutorial' ? extractTechStack(item.title + ' ' + item.content) : null,
               keywordId: keyword.id
             },
             include: {

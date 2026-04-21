@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import type { DifficultyGroup } from './tutorialDigest.js';
 
 interface Hotspot {
   id: string;
@@ -161,6 +162,77 @@ export async function sendDigestEmail(hotspots: Hotspot[]): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('Failed to send digest email:', error);
+    return false;
+  }
+}
+
+function formatDifficulty(level: string): string {
+  const labels: Record<string, string> = {
+    easy: '🟢 入门',
+    medium: '🟡 进阶',
+    hard: '🔴 高级',
+    unknown: '⚪ 未分类'
+  };
+  return labels[level] || level;
+}
+
+export async function sendTutorialDigestEmail(groups: DifficultyGroup[], totalCount: number): Promise<boolean> {
+  const mailer = getTransporter();
+
+  if (!mailer || !process.env.NOTIFY_EMAIL || totalCount === 0) {
+    return false;
+  }
+
+  try {
+    let groupsHtml = '';
+    for (const group of groups) {
+      const rows = group.items.map(item => `
+        <tr>
+          <td style="padding: 8px; border-bottom: 1px solid #eee;">
+            <a href="${item.url}" style="color: #667eea; text-decoration: none;">${item.title.slice(0, 50)}...</a>
+          </td>
+          <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.estimatedTime || '-'}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #eee;">${item.techStack || '-'}</td>
+        </tr>
+      `).join('');
+
+      groupsHtml += `
+        <h3 style="margin: 20px 0 10px; color: #333;">${formatDifficulty(group.level)}（${group.items.length} 篇）</h3>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+          <thead>
+            <tr style="background: #f8f9fa;">
+              <th style="padding: 8px; text-align: left;">标题</th>
+              <th style="padding: 8px; text-align: left;">预计时间</th>
+              <th style="padding: 8px; text-align: left;">技术栈</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows}
+          </tbody>
+        </table>
+      `;
+    }
+
+    await mailer.sendMail({
+      from: process.env.SMTP_USER,
+      to: process.env.NOTIFY_EMAIL,
+      subject: `📚 教程简报 - ${totalCount} 篇新教程`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+          <h1>📚 教程简报</h1>
+          <p>过去 24 小时发现 <strong>${totalCount}</strong> 篇新教程</p>
+          ${groupsHtml}
+        </body>
+        </html>
+      `
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Failed to send tutorial digest email:', error);
     return false;
   }
 }
