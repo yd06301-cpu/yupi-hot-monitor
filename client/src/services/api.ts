@@ -38,9 +38,9 @@ export interface Hotspot {
   publishedAt: string | null;
   createdAt: string;
   keyword: { id: string; text: string; category: string | null } | null;
-  contentType?: string;
-  fullContent?: string;
-  fullContentFetched?: boolean;
+  contentType: string | null;
+  fullContent: string | null;
+  fullContentFetched: boolean;
 }
 
 export interface Notification {
@@ -92,35 +92,35 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 // Keywords API
 export const keywordsApi = {
   getAll: () => request<Keyword[]>('/keywords'),
-  
+
   getById: (id: string) => request<Keyword>(`/keywords/${id}`),
-  
-  create: (data: { text: string; category?: string }) => 
+
+  create: (data: { text: string; category?: string }) =>
     request<Keyword>('/keywords', {
       method: 'POST',
       body: JSON.stringify(data)
     }),
-  
-  update: (id: string, data: Partial<Keyword>) => 
+
+  update: (id: string, data: Partial<Keyword>) =>
     request<Keyword>(`/keywords/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
     }),
-  
-  delete: (id: string) => 
+
+  delete: (id: string) =>
     request<void>(`/keywords/${id}`, { method: 'DELETE' }),
-  
-  toggle: (id: string) => 
+
+  toggle: (id: string) =>
     request<Keyword>(`/keywords/${id}/toggle`, { method: 'PATCH' })
 };
 
 // Hotspots API
 export const hotspotsApi = {
-  getAll: (params?: { 
-    page?: number; 
-    limit?: number; 
-    source?: string; 
-    importance?: string; 
+  getAll: (params?: {
+    page?: number;
+    limit?: number;
+    source?: string;
+    importance?: string;
     keywordId?: string;
     isReal?: string;
     timeRange?: string;
@@ -139,18 +139,18 @@ export const hotspotsApi = {
       `/hotspots?${searchParams}`
     );
   },
-  
+
   getStats: () => request<Stats>('/hotspots/stats'),
-  
+
   getById: (id: string) => request<Hotspot>(`/hotspots/${id}`),
-  
-  search: (query: string, sources?: string[]) => 
+
+  search: (query: string, sources?: string[]) =>
     request<{ results: Hotspot[] }>('/hotspots/search', {
       method: 'POST',
       body: JSON.stringify({ query, sources })
     }),
-  
-  delete: (id: string) => 
+
+  delete: (id: string) =>
     request<void>(`/hotspots/${id}`, { method: 'DELETE' })
 };
 
@@ -167,25 +167,25 @@ export const notificationsApi = {
       `/notifications?${searchParams}`
     );
   },
-  
-  markAsRead: (id: string) => 
+
+  markAsRead: (id: string) =>
     request<Notification>(`/notifications/${id}/read`, { method: 'PATCH' }),
-  
-  markAllAsRead: () => 
+
+  markAllAsRead: () =>
     request<void>('/notifications/read-all', { method: 'PATCH' }),
-  
-  delete: (id: string) => 
+
+  delete: (id: string) =>
     request<void>(`/notifications/${id}`, { method: 'DELETE' }),
-  
-  clear: () => 
+
+  clear: () =>
     request<void>('/notifications', { method: 'DELETE' })
 };
 
 // Settings API
 export const settingsApi = {
   getAll: () => request<Record<string, string>>('/settings'),
-  
-  update: (settings: Record<string, string>) => 
+
+  update: (settings: Record<string, string>) =>
     request<void>('/settings', {
       method: 'PUT',
       body: JSON.stringify(settings)

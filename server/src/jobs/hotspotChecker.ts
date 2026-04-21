@@ -6,6 +6,7 @@ import { searchSogou, searchBilibili, searchWeibo, detectAndFetchAccount } from 
 import { fetchAllTutorialFeeds } from '../services/rssFeeds.js';
 import { analyzeContent, expandKeyword, preMatchKeyword } from '../services/ai.js';
 import { sendHotspotEmail } from '../services/email.js';
+import { isTutorialUrl } from '../services/fullTextFetcher.js';
 import type { SearchResult } from '../types.js';
 
 // 新鲜度过滤：丢弃超过指定小时数的内容
@@ -127,7 +128,7 @@ export async function runHotspotCheck(io: Server): Promise<void> {
       // 第一步：检测关键词是否为某个平台账号
       console.log(`  🎯 Detecting account for "${keyword.text}"...`);
       const accountResult = await detectAndFetchAccount(keyword.text);
-      
+
       if (accountResult.accounts.length > 0) {
         for (const acc of accountResult.accounts) {
           console.log(`  ✅ Found ${acc.platform} account: ${acc.name} (${acc.followers} followers)`);
@@ -159,7 +160,7 @@ export async function runHotspotCheck(io: Server): Promise<void> {
       ]);
 
       const allResults: SearchResult[] = [];
-      
+
       // 优先添加账号检测到的最新内容
       if (accountResult.results.length > 0) {
         allResults.push(...accountResult.results);
@@ -239,6 +240,9 @@ export async function runHotspotCheck(io: Server): Promise<void> {
             continue;
           }
 
+          // 检测内容类型
+          const contentType = isTutorialUrl(item.url, item.title, item.content) ? 'tutorial' : undefined;
+
           // 保存热点
           const hotspot = await prisma.hotspot.create({
             data: {
@@ -269,6 +273,9 @@ export async function runHotspotCheck(io: Server): Promise<void> {
               difficulty: item.source === 'tutorial' ? extractDifficulty(item.content) : null,
               estimatedTime: item.source === 'tutorial' ? extractEstimatedTime(item.content) : null,
               techStack: item.source === 'tutorial' ? extractTechStack(item.title + ' ' + item.content) : null,
+              contentType: contentType || 'article',
+              fullContent: null,
+              fullContentFetched: false,
               keywordId: keyword.id
             },
             include: {

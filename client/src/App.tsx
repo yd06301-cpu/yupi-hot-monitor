@@ -8,6 +8,7 @@ import {
   MessageCircle, Repeat2, Quote, User, Shield, ShieldAlert,
   ChevronDown, ChevronUp, ChevronsUpDown, ThermometerSun, FileText
 } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
 import {
   keywordsApi, hotspotsApi, notificationsApi, tutorialsApi, triggerHotspotCheck,
   type Keyword, type Hotspot, type Stats, type Notification
@@ -20,7 +21,6 @@ import { Meteors } from './components/ui/meteors';
 import FilterSortBar, { defaultFilterState, type FilterState } from './components/FilterSortBar';
 import { sortHotspots } from './utils/sortHotspots';
 import { relativeTime, formatDateTime } from './utils/relativeTime';
-import ReactMarkdown from 'react-markdown';
 // TextGenerateEffect available for future use
 
 /** 计算热度综合指标（归一化 0-100） */
@@ -146,6 +146,31 @@ function App() {
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  // 打开教程详情
+  const openTutorialDetail = async (hotspot: Hotspot) => {
+    setTutorialLoading(true);
+    try {
+      if (hotspot.fullContent) {
+        setTutorialDetail(hotspot);
+        setTutorialContent(hotspot.fullContent);
+      } else {
+        const data = await tutorialsApi.getContent(hotspot.id);
+        setTutorialDetail(hotspot);
+        setTutorialContent(data.content);
+      }
+    } catch {
+      showToast('获取教程内容失败', 'error');
+    } finally {
+      setTutorialLoading(false);
+    }
+  };
+
+  // 关闭教程详情
+  const closeTutorialDetail = () => {
+    setTutorialDetail(null);
+    setTutorialContent(null);
   };
 
   // 添加关键词
@@ -686,6 +711,15 @@ function App() {
                               <ThermometerSun className="w-3 h-3" />
                               {heat.label} {heatScore}
                             </span>
+                            {/* 教程阅读全文按钮 */}
+                            {hotspot.contentType === 'tutorial' && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openTutorialDetail(hotspot); }}
+                                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-400 border border-purple-500/20 hover:bg-purple-500/25 transition-colors"
+                              >
+                                📖 阅读全文
+                              </button>
+                            )}
                           </div>
                           
                           {/* Title */}
@@ -1106,6 +1140,14 @@ function App() {
                           <ThermometerSun className="w-3 h-3" />
                           {heat.label} {heatScore}
                         </span>
+                        {hotspot.contentType === 'tutorial' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openTutorialDetail(hotspot); }}
+                            className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-400 border border-purple-500/20 hover:bg-purple-500/25 transition-colors"
+                          >
+                            📖 阅读全文
+                          </button>
+                        )}
                       </div>
                       <h3 className="font-medium text-white mb-2 group-hover:text-blue-400 transition-colors">{hotspot.title}</h3>
                       {hotspot.summary && (
@@ -1227,6 +1269,8 @@ function App() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
         )}
       </AnimatePresence>
     </div>

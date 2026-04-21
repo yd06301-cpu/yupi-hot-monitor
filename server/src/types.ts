@@ -39,6 +39,7 @@ export interface AIAnalysis {
   keywordMentioned: boolean; // 内容中是否直接提及了关键词或其核心概念
   importance: 'low' | 'medium' | 'high' | 'urgent';
   summary: string; // 与关键词的关联说明（不是单纯的内容介绍）
+  contentType?: string; // 'tutorial', 'news', 'video', etc.
 }
 
 export interface HotspotWithKeyword {
@@ -69,14 +70,14 @@ export interface HotspotWithKeyword {
   publishedAt: Date | null;
   createdAt: Date;
   keywordId: string | null;
+  contentType: string;
+  fullContent: string | null;
+  fullContentFetched: boolean;
   keyword: {
     id: string;
     text: string;
     category: string | null;
   } | null;
-  contentType: string;
-  fullContent: string | null;
-  fullContentFetched: boolean;
 }
 
 export interface Tweet {

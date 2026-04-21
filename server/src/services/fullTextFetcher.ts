@@ -154,3 +154,19 @@ function htmlToMarkdown($: cheerio.CheerioAPI, html: string): string {
 
   return result;
 }
+
+/**
+ * 检测 URL 是否可能是教程
+ */
+export function isTutorialUrl(url: string, title?: string, summary?: string): boolean {
+  const text = (url + ' ' + (title || '') + ' ' + (summary || '')).toLowerCase();
+
+  const tutorialPatterns = [
+    '/tutorial/', '/learn/', '/guide/', '/docs/', '/blog/',
+    '教程', '指南', '入门', '详解', '手把手', '教程',
+    'how to', 'getting started', 'introduction to', 'beginner',
+    'step by step', 'walkthrough', 'quickstart'
+  ];
+
+  return tutorialPatterns.some(pattern => text.includes(pattern));
+}
