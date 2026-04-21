@@ -103,7 +103,7 @@ function prioritizeResults(results: SearchResult[]): SearchResult[] {
   });
 }
 
-export async function runHotspotCheck(io: Server): Promise<void> {
+export async function runHotspotCheck(io?: Server): Promise<void> {
   console.log('🔍 Starting hotspot check...');
 
   // 获取所有激活的关键词
@@ -292,14 +292,16 @@ export async function runHotspotCheck(io: Server): Promise<void> {
           });
 
           // WebSocket 通知
-          io.to(`keyword:${keyword.text}`).emit('hotspot:new', hotspot);
-          io.emit('notification', {
-            type: 'hotspot',
-            title: '发现新热点',
-            content: hotspot.title,
-            hotspotId: hotspot.id,
-            importance: hotspot.importance
-          });
+          if (io) {
+            io.to(`keyword:${keyword.text}`).emit('hotspot:new', hotspot);
+            io.emit('notification', {
+              type: 'hotspot',
+              title: '发现新热点',
+              content: hotspot.title,
+              hotspotId: hotspot.id,
+              importance: hotspot.importance
+            });
+          }
 
           // 邮件通知（仅对高重要级别）
           if (['high', 'urgent'].includes(analysis.importance)) {
