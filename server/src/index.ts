@@ -10,7 +10,9 @@ import keywordsRouter from './routes/keywords.js';
 import hotspotsRouter from './routes/hotspots.js';
 import settingsRouter from './routes/settings.js';
 import notificationsRouter from './routes/notifications.js';
+import tutorialsRouter from './routes/tutorials.js';
 import { runHotspotCheck } from './jobs/hotspotChecker.js';
+import { runTutorialFetch } from './jobs/tutorialFetcher.js';
 
 dotenv.config();
 
@@ -32,6 +34,7 @@ app.use('/api/keywords', keywordsRouter);
 app.use('/api/hotspots', hotspotsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/tutorials', tutorialsRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -74,6 +77,17 @@ cron.schedule('*/30 * * * *', async () => {
     console.log('✅ Scheduled hotspot check completed');
   } catch (error) {
     console.error('❌ Scheduled hotspot check failed:', error);
+  }
+});
+
+// Scheduled job: Run tutorial full-text fetch every hour
+cron.schedule('0 * * * *', async () => {
+  console.log('📚 Running scheduled tutorial fetch...');
+  try {
+    await runTutorialFetch(io);
+    console.log('✅ Scheduled tutorial fetch completed');
+  } catch (error) {
+    console.error('❌ Scheduled tutorial fetch failed:', error);
   }
 });
 

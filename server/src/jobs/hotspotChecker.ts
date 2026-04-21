@@ -5,6 +5,7 @@ import { searchBing, searchHackerNews, deduplicateResults } from '../services/se
 import { searchSogou, searchBilibili, searchWeibo, detectAndFetchAccount } from '../services/chinaSearch.js';
 import { analyzeContent, expandKeyword, preMatchKeyword } from '../services/ai.js';
 import { sendHotspotEmail } from '../services/email.js';
+import { isTutorialUrl } from '../services/fullTextFetcher.js';
 import type { SearchResult } from '../types.js';
 
 // 新鲜度过滤：丢弃超过指定小时数的内容
@@ -170,6 +171,9 @@ export async function runHotspotCheck(io: Server): Promise<void> {
             continue;
           }
 
+          // 检测内容类型
+          const contentType = isTutorialUrl(item.url, item.title, item.content) ? 'tutorial' : undefined;
+
           // 保存热点
           const hotspot = await prisma.hotspot.create({
             data: {
@@ -197,7 +201,8 @@ export async function runHotspotCheck(io: Server): Promise<void> {
               authorFollowers: item.author?.followers || null,
               authorVerified: item.author?.verified ?? null,
               publishedAt: item.publishedAt || null,
-              keywordId: keyword.id
+              keywordId: keyword.id,
+              contentType
             },
             include: {
               keyword: true

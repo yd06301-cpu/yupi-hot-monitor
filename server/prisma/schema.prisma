@@ -49,6 +49,9 @@ model Hotspot {
   createdAt       DateTime  @default(now())
   keywordId       String?
   keyword         Keyword?  @relation(fields: [keywordId], references: [id], onDelete: SetNull)
+  contentType     String?   // 'tutorial', 'news', 'video', etc.
+  fullContent     String?   // 完整抓取内容（Markdown/纯文本）
+  contentFetched  Boolean   @default(false)  // 是否已抓取全文
 
   @@unique([url, source])
 }

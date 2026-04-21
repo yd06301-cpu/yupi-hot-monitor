@@ -8,8 +8,9 @@ import {
   MessageCircle, Repeat2, Quote, User, Shield, ShieldAlert,
   ChevronDown, ChevronUp, ChevronsUpDown, ThermometerSun, FileText
 } from 'lucide-react';
-import { 
-  keywordsApi, hotspotsApi, notificationsApi, triggerHotspotCheck,
+import ReactMarkdown from 'react-markdown';
+import {
+  keywordsApi, hotspotsApi, notificationsApi, triggerHotspotCheck, tutorialsApi,
   type Keyword, type Hotspot, type Stats, type Notification
 } from './services/api';
 import { onNewHotspot, onNotification, subscribeToKeywords } from './services/socket';
@@ -68,6 +69,10 @@ function App() {
   const [expandedReasons, setExpandedReasons] = useState<Set<string>>(new Set());
   const [expandedContents, setExpandedContents] = useState<Set<string>>(new Set());
   const [allReasonsExpanded, setAllReasonsExpanded] = useState(false);
+  // Tutorial detail view
+  const [tutorialDetail, setTutorialDetail] = useState<Hotspot | null>(null);
+  const [tutorialContent, setTutorialContent] = useState<string | null>(null);
+  const [tutorialLoading, setTutorialLoading] = useState(false);
 
   // 加载数据
   const loadData = useCallback(async () => {
@@ -88,7 +93,7 @@ function App() {
 
       const [keywordsData, hotspotsData, statsData, notifData] = await Promise.all([
         keywordsApi.getAll(),
-        hotspotsApi.getAll(filterParams as any),
+        hotspotsApi.getAll(filterParams),
         hotspotsApi.getStats(),
         notificationsApi.getAll({ limit: 20 })
       ]);
@@ -143,6 +148,31 @@ function App() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // 打开教程详情
+  const openTutorialDetail = async (hotspot: Hotspot) => {
+    setTutorialLoading(true);
+    try {
+      if (hotspot.fullContent) {
+        setTutorialDetail(hotspot);
+        setTutorialContent(hotspot.fullContent);
+      } else {
+        const data = await tutorialsApi.getContent(hotspot.id);
+        setTutorialDetail(hotspot);
+        setTutorialContent(data.content);
+      }
+    } catch {
+      showToast('获取教程内容失败', 'error');
+    } finally {
+      setTutorialLoading(false);
+    }
+  };
+
+  // 关闭教程详情
+  const closeTutorialDetail = () => {
+    setTutorialDetail(null);
+    setTutorialContent(null);
+  };
+
   // 添加关键词
   const handleAddKeyword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -154,8 +184,9 @@ function App() {
       setNewKeyword('');
       showToast('关键词添加成功', 'success');
       subscribeToKeywords([keyword.text]);
-    } catch (error: any) {
-      showToast(error.message || '添加失败', 'error');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '添加失败';
+      showToast(message, 'error');
     }
   };
 
@@ -165,7 +196,7 @@ function App() {
       await keywordsApi.delete(id);
       setKeywords(prev => prev.filter(k => k.id !== id));
       showToast('关键词已删除', 'success');
-    } catch (error) {
+    } catch {
       showToast('删除失败', 'error');
     }
   };
@@ -175,7 +206,7 @@ function App() {
     try {
       const updated = await keywordsApi.toggle(id);
       setKeywords(prev => prev.map(k => k.id === id ? updated : k));
-    } catch (error) {
+    } catch {
       showToast('操作失败', 'error');
     }
   };
@@ -190,7 +221,7 @@ function App() {
       const result = await hotspotsApi.search(searchQuery);
       setSearchResults(result.results);
       showToast(`找到 ${result.results.length} 条结果`, 'success');
-    } catch (error) {
+    } catch {
       showToast('搜索失败', 'error');
     } finally {
       setIsLoading(false);
@@ -204,7 +235,7 @@ function App() {
       await triggerHotspotCheck();
       showToast('热点检查已触发', 'success');
       setTimeout(loadData, 5000);
-    } catch (error) {
+    } catch {
       showToast('触发失败', 'error');
     } finally {
       setIsChecking(false);
@@ -648,6 +679,15 @@ function App() {
                               <ThermometerSun className="w-3 h-3" />
                               {heat.label} {heatScore}
                             </span>
+                            {/* 教程阅读全文按钮 */}
+                            {hotspot.contentType === 'tutorial' && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); openTutorialDetail(hotspot); }}
+                                className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-400 border border-purple-500/20 hover:bg-purple-500/25 transition-colors"
+                              >
+                                📖 阅读全文
+                              </button>
+                            )}
                           </div>
                           
                           {/* Title */}
@@ -1057,6 +1097,14 @@ function App() {
                           <ThermometerSun className="w-3 h-3" />
                           {heat.label} {heatScore}
                         </span>
+                        {hotspot.contentType === 'tutorial' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openTutorialDetail(hotspot); }}
+                            className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-400 border border-purple-500/20 hover:bg-purple-500/25 transition-colors"
+                          >
+                            📖 阅读全文
+                          </button>
+                        )}
                       </div>
                       <h3 className="font-medium text-white mb-2 group-hover:text-blue-400 transition-colors">{hotspot.title}</h3>
                       {hotspot.summary && (
@@ -1115,6 +1163,93 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Tutorial Detail Overlay */}
+      <AnimatePresence>
+        {tutorialDetail && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 md:p-8"
+            onClick={closeTutorialDetail}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 40, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 40, scale: 0.95 }}
+              className="relative w-full max-w-4xl max-h-[85vh] bg-[#0a0a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-5 border-b border-white/10">
+                <div className="flex items-center gap-3 min-w-0">
+                  <button
+                    onClick={closeTutorialDetail}
+                    className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors shrink-0"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                    <span className="text-sm font-medium">返回</span>
+                  </button>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-purple-500/15 text-purple-400 border border-purple-500/20 shrink-0">
+                    教程
+                  </span>
+                </div>
+                <a
+                  href={tutorialDetail.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0"
+                >
+                  原始链接 <ExternalLink className="w-3.5 h-3.5" />
+                </a>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(85vh-70px)]">
+                {tutorialLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                  </div>
+                ) : tutorialContent ? (
+                  <div className="prose prose-invert prose-slate max-w-none">
+                    <h1 className="text-xl font-semibold text-white mb-4">{tutorialDetail.title}</h1>
+                    <ReactMarkdown
+                      components={{
+                        h1: ({ children }) => <h1 className="text-xl font-bold text-white mt-8 mb-4">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-lg font-bold text-white mt-6 mb-3">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-base font-bold text-white mt-4 mb-2">{children}</h3>,
+                        p: ({ children }) => <p className="text-slate-300 mb-4 leading-relaxed">{children}</p>,
+                        code: ({ className, children }) => {
+                          const isBlock = className?.includes('language-') || String(children).includes('\n');
+                          if (isBlock) {
+                            return <pre className="bg-white/5 border border-white/10 rounded-lg p-4 mb-4 overflow-x-auto"><code className={className}>{children}</code></pre>;
+                          }
+                          return <code className="bg-white/10 px-1.5 py-0.5 rounded text-sm text-pink-300">{children}</code>;
+                        },
+                        ul: ({ children }) => <ul className="list-disc list-inside text-slate-300 mb-4 space-y-1">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside text-slate-300 mb-4 space-y-1">{children}</ol>,
+                        li: ({ children }) => <li className="text-slate-300">{children}</li>,
+                        blockquote: ({ children }) => <blockquote className="border-l-4 border-blue-500/30 pl-4 text-slate-400 italic my-4">{children}</blockquote>,
+                        a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">{children}</a>,
+                        strong: ({ children }) => <strong className="text-white font-semibold">{children}</strong>,
+                        em: ({ children }) => <em className="text-slate-300 italic">{children}</em>,
+                        hr: () => <hr className="border-white/10 my-6" />,
+                      }}
+                    >
+                      {tutorialContent}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  <div className="text-center py-16 text-slate-500">
+                    <p>暂无内容</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

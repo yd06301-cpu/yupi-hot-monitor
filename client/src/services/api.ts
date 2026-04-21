@@ -38,6 +38,9 @@ export interface Hotspot {
   publishedAt: string | null;
   createdAt: string;
   keyword: { id: string; text: string; category: string | null } | null;
+  contentType: string | null;
+  fullContent: string | null;
+  contentFetched: boolean;
 }
 
 export interface Notification {
@@ -152,7 +155,7 @@ export const notificationsApi = {
         if (value !== undefined) searchParams.append(key, String(value));
       });
     }
-    return request<{ data: Notification[]; unreadCount: number; pagination: any }>(
+    return request<{ data: Notification[]; unreadCount: number; pagination: Record<string, unknown> }>(
       `/notifications?${searchParams}`
     );
   },
@@ -182,5 +185,28 @@ export const settingsApi = {
 };
 
 // Manual trigger
-export const triggerHotspotCheck = () => 
+export const triggerHotspotCheck = () =>
   request<{ message: string }>('/check-hotspots', { method: 'POST' });
+
+// Tutorials API
+export const tutorialsApi = {
+  getAll: (params?: { page?: number; limit?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) searchParams.append(key, String(value));
+      });
+    }
+    return request<{ data: Hotspot[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(
+      `/tutorials?${searchParams}`
+    );
+  },
+
+  getContent: (id: string) => request<{ id: string; title: string; url: string; content: string | null; contentFetched: boolean }>(`/tutorials/${id}/content`),
+
+  triggerFetch: (id: string) =>
+    request<{ message: string; content?: string }>(`/tutorials/fetch`, {
+      method: 'POST',
+      body: JSON.stringify({ id })
+    })
+};
